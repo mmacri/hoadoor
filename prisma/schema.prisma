@@ -1,0 +1,332 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  avatarUrl     String?
+  roles         String[]  @default([])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  memberships   Membership[]
+  reviews       Review[]
+  adminResponses AdminResponse[]
+  posts         Post[]
+  comments      Comment[]
+  flags         Flag[]
+  auditLogs     AuditLog[]
+
+  @@index([email])
+}
+
+model HOA {
+  id                 String   @id @default(cuid())
+  name               String
+  slug               String   @unique
+  descriptionPublic  String?
+  descriptionPrivate String?
+  location           String // "City, State ZIP"
+  city               String
+  state              String
+  zipCode            String?
+  amenities          String[] @default([])
+  unitCount          Int?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Full text search vector
+  searchVector Unsupported("tsvector")?
+
+  // Relations
+  memberships     Membership[]
+  reviews         Review[]
+  posts           Post[]
+  documents       Document[]
+  events          Event[]
+  ratingAggregate RatingAggregate?
+
+  @@index([slug])
+  @@index([city])
+  @@index([state])
+  @@index([zipCode])
+  @@index([searchVector], type: Gin)
+}
+
+model Membership {
+  id        String           @id @default(cuid())
+  userId    String
+  hoaId     String
+  role      MembershipRole   @default(MEMBER)
+  status    MembershipStatus @default(PENDING)
+  note      String? // Optional identity verification note
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hoa  HOA  @relation(fields: [hoaId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, hoaId])
+  @@index([hoaId, status])
+  @@index([userId])
+}
+
+model Review {
+  id          String        @id @default(cuid())
+  userId      String
+  hoaId       String
+  stars       Int // 1-5
+  text        String?
+  isAnonymous Boolean       @default(false)
+  status      ReviewStatus  @default(PENDING)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hoa            HOA             @relation(fields: [hoaId], references: [id], onDelete: Cascade)
+  adminResponses AdminResponse[]
+
+  @@index([hoaId, status])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model AdminResponse {
+  id               String   @id @default(cuid())
+  reviewId         String
+  responderUserId  String
+  text             String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  review    Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  responder User   @relation(fields: [responderUserId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
+}
+
+model Post {
+  id         String     @id @default(cuid())
+  hoaId      String
+  authorId   String
+  title      String
+  body       String
+  visibility Visibility @default(PRIVATE)
+  status     PostStatus @default(APPROVED)
+  isPinned   Boolean    @default(false)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  // Relations
+  hoa      HOA       @relation(fields: [hoaId], references: [id], onDelete: Cascade)
+  author   User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments Comment[]
+
+  @@index([hoaId, status])
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([authorId])
+}
+
+model Document {
+  id         String     @id @default(cuid())
+  hoaId      String
+  title      String
+  url        String
+  visibility Visibility @default(PRIVATE)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  // Relations
+  hoa HOA @relation(fields: [hoaId], references: [id], onDelete: Cascade)
+
+  @@index([hoaId])
+}
+
+model Event {
+  id          String     @id @default(cuid())
+  hoaId       String
+  title       String
+  startsAt    DateTime
+  endsAt      DateTime?
+  location    String?
+  description String?
+  visibility  Visibility @default(PRIVATE)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  hoa HOA @relation(fields: [hoaId], references: [id], onDelete: Cascade)
+
+  @@index([hoaId])
+  @@index([startsAt])
+}
+
+model Flag {
+  id           String     @id @default(cuid())
+  targetType   TargetType
+  targetId     String
+  reporterUserId String
+  reason       String
+  status       FlagStatus @default(PENDING)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relations
+  reporter User @relation(fields: [reporterUserId], references: [id], onDelete: Cascade)
+
+  @@index([targetType, targetId])
+  @@index([status])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  targetType String
+  targetId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+model RatingAggregate {
+  id         String   @id @default(cuid())
+  hoaId      String   @unique
+  average    Float
+  count      Int
+  breakdown  Json // {"1": 5, "2": 10, "3": 20, "4": 30, "5": 35}
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  hoa HOA @relation(fields: [hoaId], references: [id], onDelete: Cascade)
+
+  @@index([average])
+}
+
+// Rate limiting
+model RateLimit {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  count     Int
+  resetTime DateTime
+
+  @@index([resetTime])
+}
+
+// Enums
+enum MembershipRole {
+  MEMBER
+  ADMIN
+  PRESIDENT
+}
+
+enum MembershipStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PostStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum TargetType {
+  REVIEW
+  POST
+  COMMENT
+  USER
+}
+
+enum FlagStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
