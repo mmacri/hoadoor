@@ -52,12 +52,17 @@ When expanding features, keep flows consistent with `PID.md` personas and journe
 - **Documentation**: Update relevant markdown (README, API_REFERENCE, SELF_CHECK, etc.) whenever behavior, endpoints, or flows change.
 
 ## 5. Environment & Tooling
+
 1. **Dependencies**: The project already includes every published Radix package required. *Do not add* `@radix-ui/react-badge`; the package is not published and will cause `npm install` to fail. We ship our own badge component in `src/components/ui/badge.tsx`.
 2. **Environment variables**: Duplicate the sample config before running any scripts.
    ```bash
    cp .env.example .env.local
    ```
 3. **Local setup**:
+
+1. **Dependencies**: `npm install` currently fails because `@radix-ui/react-badge` is not published. Remove that dependency (the project ships its own badge in `src/components/ui/badge.tsx`) before installing packages and do not reintroduce it.
+2. **Local setup**:
+
    ```bash
    npm install
    npm run db:up
@@ -66,7 +71,11 @@ When expanding features, keep flows consistent with `PID.md` personas and journe
    npm run dev
    ```
    Maildev runs at http://localhost:1080 for magic link emails.
+
 4. **Database maintenance**: `npm run db:down` tears down Docker services. Use `npm run db:migrate:reset` when schema changes require a clean slate.
+
+3. **Database maintenance**: `npm run db:down` tears down Docker services. Use `npm run db:migrate:reset` when schema changes require a clean slate.
+
 
 ## 6. Quality Gates
 Run these commands (and fix failures) before committing:
