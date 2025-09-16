@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { 
   isHOAMember, 
   isHOAAdmin, 
@@ -8,9 +8,13 @@ import {
 } from '@/server/permissions'
 
 // Mock Prisma
-const mockPrisma = {
+const mockPrisma = vi.hoisted(() => ({
   membership: {
     findUnique: vi.fn()
+  }
+})) as {
+  membership: {
+    findUnique: ReturnType<typeof vi.fn>
   }
 }
 

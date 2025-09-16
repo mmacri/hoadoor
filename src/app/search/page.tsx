@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -48,15 +48,20 @@ const AMENITY_OPTIONS = [
 export default function SearchPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
-  const [location, setLocation] = useState(searchParams.get('location') || '')
+
+  const initialFiltersRef = useRef({
+    query: searchParams.get('q') || '',
+    location: searchParams.get('location') || '',
+    amenities: searchParams.get('amenities')?.split(',').filter(Boolean) || [],
+    rating: searchParams.get('ratingMin') ? Number(searchParams.get('ratingMin')) : 0
+  })
+
+  const [searchQuery, setSearchQuery] = useState(initialFiltersRef.current.query)
+  const [location, setLocation] = useState(initialFiltersRef.current.location)
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>(
-    searchParams.get('amenities')?.split(',').filter(Boolean) || []
+    initialFiltersRef.current.amenities
   )
-  const [minRating, setMinRating] = useState<number>(
-    searchParams.get('ratingMin') ? Number(searchParams.get('ratingMin')) : 0
-  )
+  const [minRating, setMinRating] = useState<number>(initialFiltersRef.current.rating)
   
   const [results, setResults] = useState<SearchResult[]>([])
   const [pagination, setPagination] = useState<SearchResponse['pagination'] | null>(null)
@@ -64,57 +69,59 @@ export default function SearchPage() {
   const [error, setError] = useState<string | null>(null)
   const [showFilters, setShowFilters] = useState(false)
 
-  const performSearch = debounce(async (
-    query: string,
-    locationFilter: string,
-    amenities: string[],
-    rating: number,
-    page: number = 1
-  ) => {
-    setLoading(true)
-    setError(null)
+  const performSearch = useMemo(() =>
+    debounce(async (
+      query: string,
+      locationFilter: string,
+      amenities: string[],
+      rating: number,
+      page: number = 1
+    ) => {
+      setLoading(true)
+      setError(null)
 
-    try {
-      const params = new URLSearchParams()
-      if (query) params.set('q', query)
-      if (locationFilter) params.set('location', locationFilter)
-      if (amenities.length > 0) params.set('amenities', amenities.join(','))
-      if (rating > 0) params.set('ratingMin', rating.toString())
-      params.set('page', page.toString())
-      params.set('limit', '12')
+      try {
+        const params = new URLSearchParams()
+        if (query) params.set('q', query)
+        if (locationFilter) params.set('location', locationFilter)
+        if (amenities.length > 0) params.set('amenities', amenities.join(','))
+        if (rating > 0) params.set('ratingMin', rating.toString())
+        params.set('page', page.toString())
+        params.set('limit', '12')
 
-      const response = await fetch(`/api/search?${params.toString()}`)
-      
-      if (!response.ok) {
-        throw new Error('Search failed')
+        const response = await fetch(`/api/search?${params.toString()}`)
+
+        if (!response.ok) {
+          throw new Error('Search failed')
+        }
+
+        const data: SearchResponse = await response.json()
+
+        if (page === 1) {
+          setResults(data.hoas)
+        } else {
+          setResults(prev => [...prev, ...data.hoas])
+        }
+
+        setPagination(data.pagination)
+
+        // Update URL
+        const newParams = new URLSearchParams()
+        if (query) newParams.set('q', query)
+        if (locationFilter) newParams.set('location', locationFilter)
+        if (amenities.length > 0) newParams.set('amenities', amenities.join(','))
+        if (rating > 0) newParams.set('ratingMin', rating.toString())
+
+        router.replace(`/search?${newParams.toString()}`, { scroll: false })
+
+      } catch (err) {
+        setError('Failed to search HOAs. Please try again.')
+        console.error('Search error:', err)
+      } finally {
+        setLoading(false)
       }
-
-      const data: SearchResponse = await response.json()
-      
-      if (page === 1) {
-        setResults(data.hoas)
-      } else {
-        setResults(prev => [...prev, ...data.hoas])
-      }
-      
-      setPagination(data.pagination)
-
-      // Update URL
-      const newParams = new URLSearchParams()
-      if (query) newParams.set('q', query)
-      if (locationFilter) newParams.set('location', locationFilter)
-      if (amenities.length > 0) newParams.set('amenities', amenities.join(','))
-      if (rating > 0) newParams.set('ratingMin', rating.toString())
-      
-      router.replace(`/search?${newParams.toString()}`, { scroll: false })
-
-    } catch (err) {
-      setError('Failed to search HOAs. Please try again.')
-      console.error('Search error:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, 300)
+    }, 300)
+  , [router])
 
   const handleSearch = () => {
     performSearch(searchQuery, location, selectedAmenities, minRating, 1)
@@ -146,15 +153,12 @@ export default function SearchPage() {
 
   // Perform initial search on page load
   useEffect(() => {
-    const initialQuery = searchParams.get('q') || ''
-    const initialLocation = searchParams.get('location') || ''
-    const initialAmenities = searchParams.get('amenities')?.split(',').filter(Boolean) || []
-    const initialRating = searchParams.get('ratingMin') ? Number(searchParams.get('ratingMin')) : 0
+    const { query, location: initialLocation, amenities, rating } = initialFiltersRef.current
 
-    if (initialQuery || initialLocation || initialAmenities.length > 0 || initialRating > 0) {
-      performSearch(initialQuery, initialLocation, initialAmenities, initialRating, 1)
+    if (query || initialLocation || amenities.length > 0 || rating > 0) {
+      performSearch(query, initialLocation, amenities, rating, 1)
     }
-  }, [])
+  }, [performSearch])
 
   return (
     <div className="container py-6">

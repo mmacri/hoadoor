@@ -2,12 +2,19 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { checkRateLimit, enforceRateLimit, RATE_LIMITS } from '@/server/ratelimit'
 
 // Mock Prisma
-const mockPrisma = {
+const mockPrisma = vi.hoisted(() => ({
   rateLimit: {
     findUnique: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     deleteMany: vi.fn()
+  }
+})) as {
+  rateLimit: {
+    findUnique: ReturnType<typeof vi.fn>
+    create: ReturnType<typeof vi.fn>
+    update: ReturnType<typeof vi.fn>
+    deleteMany: ReturnType<typeof vi.fn>
   }
 }
 
