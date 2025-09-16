@@ -138,6 +138,10 @@ See `/prisma/schema.prisma` for complete schema definition.
 
 *Requires authentication
 
+## ☁️ Deploying to Google Cloud
+
+Ready to run HOAdoor on Google Cloud? The repository includes an automated provisioning script that spins up Cloud SQL, deploys the application to Cloud Run, and runs Prisma migrations for you. Follow the step-by-step instructions in [`docs/deploying-to-gcp.md`](docs/deploying-to-gcp.md) to configure your environment variables and launch the stack.
+
 ## 🧪 Testing
 
 ### Running Tests
