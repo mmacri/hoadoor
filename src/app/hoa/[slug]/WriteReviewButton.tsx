@@ -149,7 +149,7 @@ export function WriteReviewButton({ hoaId, hoaName }: WriteReviewButtonProps) {
               <Checkbox
                 id="anonymous"
                 checked={isAnonymous}
-                onCheckedChange={setIsAnonymous}
+                onCheckedChange={(checked) => setIsAnonymous(checked === true)}
               />
               <Label htmlFor="anonymous" className="text-sm">
                 Post anonymously
